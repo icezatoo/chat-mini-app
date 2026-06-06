@@ -67,7 +67,7 @@ body {
 
 /* ---- Header ---------------------------------------------- */
 .chat-header {
-  padding: 52px 12px 12px;
+  padding: 12px 12px 12px;
   background: var(--card);
   display: flex;
   align-items: center;
