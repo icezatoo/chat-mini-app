@@ -1,13 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
-
-const ibmPlexSansThai = IBM_Plex_Sans_Thai({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["thai", "latin"],
-  variable: "--font-ibm-plex-thai",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "เป๋าตัง · ที่ปรึกษาการเงิน",
@@ -38,11 +30,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`${ibmPlexSansThai.variable} h-full`}>
+    <html lang="th" className="h-full" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
-      <body className="h-full overflow-hidden">{children}</body>
+      <body className="h-full overflow-hidden" suppressHydrationWarning>{children}</body>
     </html>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { nowTime, sleep } from "@/lib/utils";
 import Header from "./header";
 import Welcome from "./welcome";
@@ -19,6 +20,10 @@ import type { SummaryData } from "@/components/intake/summary-card";
 
 const AGENT_NAME = "เจ้าหน้าที่ ณัฐพล";
 
+type ChatAppProps = {
+  selectedUser: string;
+};
+
 // ---- Message type union -------------------------------------
 type MsgBase = { id: number };
 type TextMsg = MsgBase & { type: "user" | "bot" | "agent"; text: string; time: string };
@@ -31,10 +36,12 @@ type FormMsg = MsgBase & { type: "form" } & ({ locked: false } | { locked: true;
 export type Message = TextMsg | TypingMsg | ChipsMsg | ActionsMsg | ConnectingMsg | SystemMsg | FormMsg;
 type MsgInit = Message extends infer M ? M extends { id: number } ? Omit<M, "id"> : never : never;
 
-export default function ChatApp() {
+export default function ChatApp({ selectedUser }: ChatAppProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState<"bot" | "agent">("bot");
   const [busy, setBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"exit" | "reset" | null>(null);
+  const router = useRouter();
   const idRef = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -239,6 +246,31 @@ export default function ChatApp() {
     setBusy(false);
   }, []);
 
+  const goHome = useCallback(() => {
+    setConfirmAction("exit");
+  }, []);
+
+  const openResetConfirm = useCallback(() => {
+    setConfirmAction("reset");
+  }, []);
+
+  const confirmActionNow = useCallback(() => {
+    if (confirmAction === "exit") {
+      setConfirmAction(null);
+      router.push("/");
+      return;
+    }
+
+    if (confirmAction === "reset") {
+      setConfirmAction(null);
+      reset();
+    }
+  }, [confirmAction, reset, router]);
+
+  const cancelConfirm = useCallback(() => {
+    setConfirmAction(null);
+  }, []);
+
   // ---- render ----------------------------------------------
   const renderMsg = useCallback((m: Message) => {
     switch (m.type) {
@@ -275,10 +307,10 @@ export default function ChatApp() {
 
   return (
     <div className="chat-screen">
-      <Header mode={mode} onBack={reset} onReset={reset} />
+      <Header mode={mode} onBack={goHome} onReset={openResetConfirm} />
       <div className="chat-scroll" ref={scrollRef}>
         {messages.length === 0 ? (
-          <Welcome onPick={(act) => dispatch(act)} />
+          <Welcome selectedUser={selectedUser} onPick={(act) => dispatch(act)} />
         ) : (
           <>
             <div className="day-chip">วันนี้</div>
@@ -292,6 +324,35 @@ export default function ChatApp() {
           mode === "agent" ? "พิมพ์ถึงเจ้าหน้าที่…" : "พิมพ์ข้อความถึงน้องฟิน…"
         }
       />
+      {confirmAction ? (
+        <div className="exit-backdrop" role="presentation" onClick={cancelConfirm}>
+          <div
+            className="exit-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="exit-title"
+            aria-describedby="exit-desc"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="exit-title" id="exit-title">
+              {confirmAction === "exit" ? "ออกจากหน้าแชต" : "ล้างบทสนทนา"}
+            </div>
+            <div className="exit-desc" id="exit-desc">
+              {confirmAction === "exit"
+                ? "ต้องการกลับไปหน้าแรกหรือไม่"
+                : "ต้องการล้างข้อความทั้งหมดและเริ่มใหม่หรือไม่"}
+            </div>
+            <div className="exit-actions">
+              <button type="button" className="exit-btn secondary" onClick={cancelConfirm}>
+                อยู่ต่อ
+              </button>
+              <button type="button" className="exit-btn primary" onClick={confirmActionNow}>
+                {confirmAction === "exit" ? "กลับหน้าแรก" : "ล้างบทสนทนา"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

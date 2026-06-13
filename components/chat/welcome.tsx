@@ -31,16 +31,18 @@ const TOPICS = [
 ];
 
 interface WelcomeProps {
+  selectedUser: string;
   onPick: (act: string) => void;
 }
 
-export default function Welcome({ onPick }: WelcomeProps) {
+export default function Welcome({ selectedUser, onPick }: WelcomeProps) {
   return (
     <div className="welcome">
       <div className="welcome-hero">
         <div className="welcome-avatar">
           <BotAvatar size={64} float />
         </div>
+        <div className="welcome-profile">กำลังใช้งาน: {selectedUser}</div>
         <h1 className="welcome-greet">สวัสดีค่ะ ยินดีให้คำปรึกษา</h1>
         <p className="welcome-sub">
           ดิฉัน <b>{BOT_NAME}</b> ผู้ช่วยที่ปรึกษาทางการเงิน ดูแลเรื่องการปรับโครงสร้างหนี้
