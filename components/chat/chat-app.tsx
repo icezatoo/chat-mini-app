@@ -24,6 +24,11 @@ type ChatAppProps = {
   selectedUser: string;
 };
 
+type StoredChatSession = {
+  messages: PersistedMessage[];
+  mode: "bot" | "agent";
+};
+
 // ---- Message type union -------------------------------------
 type MsgBase = { id: number };
 type TextMsg = MsgBase & { type: "user" | "bot" | "agent"; text: string; time: string };
@@ -34,21 +39,77 @@ type ConnectingMsg = MsgBase & { type: "connecting" };
 type SystemMsg = MsgBase & { type: "system"; text: string };
 type FormMsg = MsgBase & { type: "form" } & ({ locked: false } | { locked: true; data: SummaryData });
 export type Message = TextMsg | TypingMsg | ChipsMsg | ActionsMsg | ConnectingMsg | SystemMsg | FormMsg;
+type PersistedMessage = Exclude<Message, TypingMsg | ConnectingMsg>;
 type MsgInit = Message extends infer M ? M extends { id: number } ? Omit<M, "id"> : never : never;
+
+const isPersistedMessage = (message: Message): message is PersistedMessage =>
+  message.type !== "typing" && message.type !== "connecting";
 
 export default function ChatApp({ selectedUser }: ChatAppProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState<"bot" | "agent">("bot");
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"exit" | "reset" | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
   const idRef = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const storageKeyRef = useRef(`chat-session:${selectedUser}`);
+
+  useEffect(() => {
+    storageKeyRef.current = `chat-session:${selectedUser}`;
+    setHydrated(false);
+    setMessages([]);
+    setMode("bot");
+    setBusy(false);
+    setConfirmAction(null);
+    idRef.current = 1;
+
+    try {
+      const raw = window.localStorage.getItem(storageKeyRef.current);
+      if (!raw) {
+        setHydrated(true);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Partial<StoredChatSession>;
+      const savedMessages = Array.isArray(parsed.messages)
+        ? parsed.messages.filter(
+            (message): message is PersistedMessage => {
+              const kind = (message as { type?: string } | null | undefined)?.type;
+              return kind !== "typing" && kind !== "connecting";
+            }
+          )
+        : [];
+      const savedMode = parsed.mode === "agent" ? "agent" : "bot";
+
+      setMessages(savedMessages as Message[]);
+      setMode(savedMode);
+      const maxId = savedMessages.reduce((max, message) => Math.max(max, message.id ?? 0), 0);
+      idRef.current = maxId + 1;
+    } catch {
+      window.localStorage.removeItem(storageKeyRef.current);
+    } finally {
+      setHydrated(true);
+    }
+  }, [selectedUser]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(
+        storageKeyRef.current,
+        JSON.stringify({ messages: messages.filter(isPersistedMessage), mode } satisfies StoredChatSession)
+      );
+    } catch {
+      // Ignore storage quota / privacy failures.
+    }
+  }, [messages, mode, hydrated]);
 
   const nid = () => idRef.current++;
 
@@ -244,6 +305,11 @@ export default function ChatApp({ selectedUser }: ChatAppProps) {
     setMessages([]);
     setMode("bot");
     setBusy(false);
+    try {
+      window.localStorage.removeItem(storageKeyRef.current);
+    } catch {
+      // Ignore storage failures on reset.
+    }
   }, []);
 
   const goHome = useCallback(() => {
@@ -309,7 +375,7 @@ export default function ChatApp({ selectedUser }: ChatAppProps) {
     <div className="chat-screen">
       <Header mode={mode} onBack={goHome} onReset={openResetConfirm} />
       <div className="chat-scroll" ref={scrollRef}>
-        {messages.length === 0 ? (
+        {!hydrated ? null : messages.length === 0 ? (
           <Welcome selectedUser={selectedUser} onPick={(act) => dispatch(act)} />
         ) : (
           <>
