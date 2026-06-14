@@ -1,16 +1,50 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { CHAT_USERS } from "@/lib/users";
+import { useEffect, useMemo, useState } from "react";
+import type { ChatUser } from "@/lib/users";
+import { fetchChatUsers } from "@/lib/users";
 
 export default function UserSelectScreen() {
   const router = useRouter();
-  const [selectedUser, setSelectedUser] = useState(CHAT_USERS[0]?.id ?? "");
+  const [users, setUsers] = useState<ChatUser[]>([]);
+  const [selectedUser, setSelectedUser] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+
+    const load = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const list = await fetchChatUsers();
+        if (!alive) return;
+
+        setUsers(list);
+        setSelectedUser((current) => current || list[0]?.id || "");
+      } catch {
+        if (!alive) return;
+        setError("ไม่สามารถโหลดรายชื่อลูกค้าได้");
+        setUsers([]);
+        setSelectedUser("");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    void load();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const selectedLabel = useMemo(
-    () => CHAT_USERS.find((user) => user.id === selectedUser)?.label ?? "",
-    [selectedUser]
+    () => users.find((user) => user.id === selectedUser)?.label ?? "",
+    [users, selectedUser]
   );
 
   const onContinue = () => {
@@ -37,8 +71,12 @@ export default function UserSelectScreen() {
             className="home-select"
             value={selectedUser}
             onChange={(event) => setSelectedUser(event.target.value)}
+            disabled={loading || !users.length}
           >
-            {CHAT_USERS.map((user) => (
+            <option value="" disabled>
+              {loading ? "กำลังโหลดรายชื่อลูกค้า..." : "เลือกลูกค้า"}
+            </option>
+            {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.label}
               </option>
@@ -46,13 +84,15 @@ export default function UserSelectScreen() {
           </select>
         </div>
 
-        <div className="home-preview">เลือกไว้แล้ว: {selectedLabel}</div>
+        <div className="home-preview">
+          {error || (selectedLabel ? `เลือกไว้แล้ว: ${selectedLabel}` : "ยังไม่ได้เลือกลูกค้า")}
+        </div>
 
         <button
           type="button"
           className="home-button"
           onClick={onContinue}
-          disabled={!selectedUser}
+          disabled={!selectedUser || loading || !users.length}
         >
           เข้าสู่หน้าแชต
         </button>

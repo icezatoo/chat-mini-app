@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import ChatApp from "@/components/chat/chat-app";
-import { getChatUser } from "@/lib/users";
+import { fetchChatUsers, getChatUser } from "@/lib/users";
 
 type ChatPageProps = {
   searchParams: Promise<{
@@ -10,7 +10,8 @@ type ChatPageProps = {
 
 export default async function ChatPage({ searchParams }: ChatPageProps) {
   const params = await searchParams;
-  const user = getChatUser(params.user);
+  const users = await fetchChatUsers();
+  const user = getChatUser(users, params.user);
 
   if (!user) {
     redirect("/");

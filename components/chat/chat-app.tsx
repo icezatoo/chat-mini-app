@@ -373,7 +373,12 @@ export default function ChatApp({ selectedUser }: ChatAppProps) {
 
   return (
     <div className="chat-screen">
-      <Header mode={mode} onBack={goHome} onReset={openResetConfirm} />
+      <Header
+        mode={mode}
+        currentUser={selectedUser}
+        onBack={goHome}
+        onReset={openResetConfirm}
+      />
       <div className="chat-scroll" ref={scrollRef}>
         {!hydrated ? null : messages.length === 0 ? (
           <Welcome selectedUser={selectedUser} onPick={(act) => dispatch(act)} />

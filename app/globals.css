@@ -136,6 +136,13 @@ body {
   line-height: 1;
 }
 
+.hdr-user {
+  margin-top: 3px;
+  font-size: 11px;
+  color: color-mix(in oklab, var(--accent-ink), #fff 48%);
+  line-height: 1.15;
+}
+
 .dot-online {
   width: 7px;
   height: 7px;
