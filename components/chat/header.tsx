@@ -7,11 +7,12 @@ const AGENT_NAME = "เจ้าหน้าที่ ณัฐพล";
 
 type HeaderProps = {
   mode: "bot" | "agent";
+  currentUser: string;
   onBack: () => void;
   onReset: () => void;
 };
 
-export default function Header({ mode, onBack, onReset }: HeaderProps) {
+export default function Header({ mode, currentUser, onBack, onReset }: HeaderProps) {
   const isAgent = mode === "agent";
   return (
     <div className="chat-header">
@@ -35,6 +36,7 @@ export default function Header({ mode, onBack, onReset }: HeaderProps) {
               ? "ทีมที่ปรึกษา · กำลังสนทนา"
               : "ที่ปรึกษาทางการเงิน · ออนไลน์"}
           </div>
+          <div className="hdr-user">ผู้ใช้ปัจจุบัน · {currentUser}</div>
         </div>
       </div>
       <button

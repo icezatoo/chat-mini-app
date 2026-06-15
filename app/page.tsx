@@ -1,5 +1,5 @@
-import ChatApp from "@/components/chat/chat-app";
+import UserSelectScreen from "@/components/home/user-select-screen";
 
 export default function Home() {
-  return <ChatApp />;
+  return <UserSelectScreen />;
 }
