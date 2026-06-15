@@ -59,7 +59,7 @@ export default function UserSelectScreen() {
         <h1 className="home-title">เลือกผู้ใช้ก่อนเข้าแชต</h1>
         <p className="home-sub">
           เลือกโปรไฟล์จากรายการด้านล่างเพื่อเข้าสู่หน้าพูดคุย
-          ระบบจะใช้โปรไฟล์ที่เลือกเป็นจุดเริ่มต้นของการสนทนา
+          ระบบจะใช้โปรไฟล์ที่เลือกเป็นตัวตนสำหรับการเชื่อมต่ออัตโนมัติ
         </p>
 
         <div className="home-field">
@@ -85,7 +85,8 @@ export default function UserSelectScreen() {
         </div>
 
         <div className="home-preview">
-          {error || (selectedLabel ? `เลือกไว้แล้ว: ${selectedLabel}` : "ยังไม่ได้เลือกลูกค้า")}
+          {error ||
+            (selectedLabel ? `เลือกไว้แล้ว: ${selectedLabel}` : "ยังไม่ได้เลือกลูกค้า")}
         </div>
 
         <button

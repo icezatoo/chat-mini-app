@@ -17,5 +17,5 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
     redirect("/");
   }
 
-  return <ChatApp selectedUser={user.label} />;
+  return <ChatApp selectedUserId={user.id} selectedUserLabel={user.label} />;
 }

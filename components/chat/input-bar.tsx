@@ -4,18 +4,21 @@ import { useState } from "react";
 import { IcSend } from "@/components/icons";
 
 interface InputBarProps {
-  onSend: (text: string) => void;
+  onSend: (text: string) => boolean;
   placeholder?: string;
+  disabled?: boolean;
 }
 
-export default function InputBar({ onSend, placeholder }: InputBarProps) {
+export default function InputBar({ onSend, placeholder, disabled }: InputBarProps) {
   const [val, setVal] = useState("");
 
   const send = () => {
+    if (disabled) return;
     const t = val.trim();
     if (!t) return;
-    onSend(t);
-    setVal("");
+    if (onSend(t)) {
+      setVal("");
+    }
   };
 
   return (
@@ -28,11 +31,12 @@ export default function InputBar({ onSend, placeholder }: InputBarProps) {
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}
+          disabled={disabled}
         />
       </div>
       <button
         className="send-btn"
-        disabled={!val.trim()}
+        disabled={disabled || !val.trim()}
         onClick={send}
         aria-label="ส่ง"
       >

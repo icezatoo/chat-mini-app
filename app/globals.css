@@ -65,6 +65,20 @@ body {
   margin: 0 auto;
 }
 
+.chat-headroom {
+  height: 75px;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition:
+    height 180ms ease,
+    opacity 180ms ease;
+}
+
+.chat-headroom.is-hidden {
+  height: 0;
+  opacity: 0;
+}
+
 /* ---- Header ---------------------------------------------- */
 .chat-header {
   padding: 12px 12px 12px;
@@ -78,6 +92,13 @@ body {
     0 6px 16px -12px rgba(20, 50, 65, 0.18);
   z-index: 5;
   flex-shrink: 0;
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+.chat-headroom.is-hidden .chat-header {
+  transform: translateY(-100%);
 }
 
 .hdr-btn {
@@ -174,6 +195,24 @@ body {
   background: color-mix(in oklab, var(--ink), #fff 90%);
   padding: 4px 11px;
   border-radius: 999px;
+}
+
+.chat-banner,
+.chat-loading {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--card), var(--accent-soft) 38%);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat-banner-error {
+  border-color: color-mix(in oklab, #d64040, #fff 54%);
+  background: color-mix(in oklab, #fff, #fef0f0 56%);
+  color: #9c2c2c;
 }
 
 /* ============================================================
@@ -342,6 +381,25 @@ body {
 }
 
 .home-select:focus {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent), #fff 84%);
+}
+
+.home-textarea {
+  width: 100%;
+  min-height: 108px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.home-textarea:focus {
   border-color: var(--accent-line);
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent), #fff 84%);
 }
@@ -1178,6 +1236,16 @@ body {
 
 .chat-input input::placeholder {
   color: var(--faint);
+}
+
+.chat-input input:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.send-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .send-btn {
