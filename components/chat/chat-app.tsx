@@ -34,7 +34,7 @@ type ChatAppProps = {
 };
 
 type MsgBase = { id: string };
-type TextMsg = MsgBase & { type: "user" | "bot" | "agent"; text: string; time: string };
+type TextMsg = MsgBase & { type: "user" | "bot" | "agent"; text: string; time: string; status?: "sent" | "read" };
 type TypingMsg = MsgBase & { type: "typing"; who: "bot" | "agent" };
 type ChipsMsg = MsgBase & { type: "chips"; items: ChipItem[] };
 type ActionsMsg = MsgBase & { type: "actions" };
@@ -79,6 +79,7 @@ const toTextMessage = (message: NormalizedChatMessage): TextMsg => ({
   type: message.senderRole === "bot" ? "bot" : message.senderRole === "agent" ? "agent" : "user",
   text: message.content,
   time: formatMessageTime(message.createdAt),
+  status: message.senderRole === "user" ? "read" : undefined,
 });
 
 const buildFormPrompt = (data: FormSubmitData) => {
@@ -109,6 +110,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
   const wsRef = useRef<WebSocket | null>(null);
   const pendingTypingIdRef = useRef<string | null>(null);
   const sendLockRef = useRef(false);
+  const optimisticUserMsgIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMessages([]);
@@ -121,6 +123,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
     setApiError("");
     pendingTypingIdRef.current = null;
     sendLockRef.current = false;
+    optimisticUserMsgIdRef.current = null;
     lastScrollTopRef.current = 0;
   }, [selectedUserId]);
 
@@ -208,10 +211,12 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
       setConnectionState("error");
       setBusy(false);
       sendLockRef.current = false;
-      if (pendingTypingIdRef.current) {
-        setMessages((current) => current.filter((message) => message.id !== pendingTypingIdRef.current));
-        pendingTypingIdRef.current = null;
-      }
+      setMessages((current) => current.filter((message) => 
+        message.id !== pendingTypingIdRef.current && 
+        !message.id.startsWith("user-opt")
+      ));
+      pendingTypingIdRef.current = null;
+      optimisticUserMsgIdRef.current = null;
       setApiError(`เชื่อมต่อ chat-service ไม่สำเร็จ (${baseUrl})`);
     };
 
@@ -219,10 +224,12 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
       setConnectionState("closed");
       setBusy(false);
       sendLockRef.current = false;
-      if (pendingTypingIdRef.current) {
-        setMessages((current) => current.filter((message) => message.id !== pendingTypingIdRef.current));
-        pendingTypingIdRef.current = null;
-      }
+      setMessages((current) => current.filter((message) => 
+        message.id !== pendingTypingIdRef.current && 
+        !message.id.startsWith("user-opt")
+      ));
+      pendingTypingIdRef.current = null;
+      optimisticUserMsgIdRef.current = null;
     };
 
     socket.onmessage = (event) => {
@@ -239,15 +246,17 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
         const errorText = payload.error || "chat-service ส่งข้อผิดพลาดกลับมา";
         setBusy(false);
         sendLockRef.current = false;
-        if (pendingTypingIdRef.current) {
-          setMessages((current) => current.filter((message) => message.id !== pendingTypingIdRef.current));
-          pendingTypingIdRef.current = null;
-        }
+        setMessages((current) => {
+          const next = current.filter((message) => 
+            message.id !== pendingTypingIdRef.current && 
+            !message.id.startsWith("user-opt")
+          );
+          next.push({ id: makeId("system"), type: "system", text: errorText });
+          return next;
+        });
+        pendingTypingIdRef.current = null;
+        optimisticUserMsgIdRef.current = null;
         setApiError(errorText);
-        setMessages((current) => [
-          ...current,
-          { id: makeId("system"), type: "system", text: errorText },
-        ]);
         return;
       }
 
@@ -264,24 +273,40 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
 
       if (normalized.senderRole === "user") {
         setMessages((current) => {
-          const next = [...current, toTextMessage(normalized)];
-          if (sendLockRef.current && !pendingTypingIdRef.current) {
-            const typingId = makeId("typing");
-            pendingTypingIdRef.current = typingId;
-            next.push({ id: typingId, type: "typing", who: "bot" });
+          const optId = optimisticUserMsgIdRef.current;
+          let replaced = false;
+          const next = current.map((msg) => {
+            if (optId && msg.id === optId) {
+              replaced = true;
+              return toTextMessage(normalized);
+            }
+            return msg;
+          });
+          if (!replaced) {
+            const filtered = next.filter((msg) => !msg.id.startsWith("user-opt"));
+            filtered.push(toTextMessage(normalized));
+            if (sendLockRef.current && !pendingTypingIdRef.current) {
+              const typingId = makeId("typing");
+              pendingTypingIdRef.current = typingId;
+              filtered.push({ id: typingId, type: "typing", who: "bot" });
+            }
+            return filtered;
           }
           return next;
         });
+        optimisticUserMsgIdRef.current = null;
         return;
       }
 
       setMessages((current) => {
-        const withoutTyping = pendingTypingIdRef.current
-          ? current.filter((message) => message.id !== pendingTypingIdRef.current)
-          : current;
+        const filtered = current.filter((message) => 
+          message.id !== pendingTypingIdRef.current && 
+          !message.id.startsWith("user-opt")
+        );
         pendingTypingIdRef.current = null;
         sendLockRef.current = false;
-        return [...withoutTyping, toTextMessage(normalized)];
+        optimisticUserMsgIdRef.current = null;
+        return [...filtered, toTextMessage(normalized)];
       });
 
       if (normalized.senderRole === "bot" || normalized.senderRole === "agent") {
@@ -311,6 +336,39 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
       setBusy(true);
       setApiError("");
 
+      const userMsgId = makeId("user-opt");
+      optimisticUserMsgIdRef.current = userMsgId;
+
+      const tempUserMsg: TextMsg = {
+        id: userMsgId,
+        type: "user",
+        text: text,
+        time: nowTime(),
+        status: "sent",
+      };
+
+      setMessages((current) => {
+        const next = [...current, tempUserMsg];
+        if (!pendingTypingIdRef.current) {
+          const typingId = makeId("typing");
+          pendingTypingIdRef.current = typingId;
+          next.push({ id: typingId, type: "typing", who: mode === "agent" ? "agent" : "bot" });
+        }
+        return next;
+      });
+
+      // Mark the message as read after a short delay (e.g. 1.2s)
+      setTimeout(() => {
+        setMessages((current) =>
+          current.map((msg) => {
+            if (msg.type === "user" && (msg.id === userMsgId || (msg.text === text && msg.status === "sent"))) {
+              return { ...msg, status: "read" };
+            }
+            return msg;
+          })
+        );
+      }, 1200);
+
       try {
         socket.send(
           JSON.stringify({
@@ -321,13 +379,18 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
         );
         return true;
       } catch (error) {
+        setMessages((current) => current.filter((message) => 
+          message.id !== userMsgId && message.id !== pendingTypingIdRef.current
+        ));
+        pendingTypingIdRef.current = null;
+        optimisticUserMsgIdRef.current = null;
         setBusy(false);
         sendLockRef.current = false;
         setApiError(error instanceof Error ? error.message : "ส่งข้อความไม่สำเร็จ");
         return false;
       }
     },
-    [selectedUserId]
+    [selectedUserId, mode]
   );
 
   const dispatch = useCallback(
@@ -418,7 +481,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
         case "user":
         case "bot":
         case "agent":
-          return <Bubble key={message.id} kind={message.type} text={message.text} time={message.time} />;
+          return <Bubble key={message.id} kind={message.type} text={message.text} time={message.time} status={message.status} />;
         case "typing":
           return <TypingIndicator key={message.id} who={message.who} />;
         case "chips":
@@ -463,7 +526,8 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
         <InputBar
           onSend={onSend}
           placeholder={mode === "agent" ? "พิมพ์ถึงเจ้าหน้าที่…" : "พิมพ์ข้อความถึงน้องฟิน…"}
-        disabled={!canSend}
+          disabled={connectionState !== "open"}
+          busy={busy}
         />
       {confirmAction ? (
         <div className="exit-backdrop" role="presentation" onClick={cancelConfirm}>

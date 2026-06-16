@@ -7,13 +7,14 @@ interface InputBarProps {
   onSend: (text: string) => boolean;
   placeholder?: string;
   disabled?: boolean;
+  busy?: boolean;
 }
 
-export default function InputBar({ onSend, placeholder, disabled }: InputBarProps) {
+export default function InputBar({ onSend, placeholder, disabled, busy }: InputBarProps) {
   const [val, setVal] = useState("");
 
   const send = () => {
-    if (disabled) return;
+    if (disabled || busy) return;
     const t = val.trim();
     if (!t) return;
     if (onSend(t)) {
@@ -36,7 +37,7 @@ export default function InputBar({ onSend, placeholder, disabled }: InputBarProp
       </div>
       <button
         className="send-btn"
-        disabled={disabled || !val.trim()}
+        disabled={disabled || busy || !val.trim()}
         onClick={send}
         aria-label="ส่ง"
       >
