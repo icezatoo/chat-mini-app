@@ -25,6 +25,7 @@ import type { ChipItem } from "@/components/messages/chip-row";
 import type { FormSubmitData } from "@/components/intake/intake-form";
 import type { SummaryData } from "@/components/intake/summary-card";
 import { buildSummaryRows } from "@/lib/debtFlow";
+import OfferCardsBlock, { type OfferCardEntry } from "../messages/offer-cards";
 
 const AGENT_NAME = "เจ้าหน้าที่ ณัฐพล";
 
@@ -40,7 +41,8 @@ type ChipsMsg = MsgBase & { type: "chips"; items: ChipItem[] };
 type ActionsMsg = MsgBase & { type: "actions" };
 type SystemMsg = MsgBase & { type: "system"; text: string };
 type FormMsg = MsgBase & { type: "form" } & ({ locked: false } | { locked: true; data: SummaryData });
-type Message = TextMsg | TypingMsg | ChipsMsg | ActionsMsg | SystemMsg | FormMsg;
+type OfferCardsMsg = MsgBase & { type: "offerCards"; cards: OfferCardEntry[] };
+type Message = TextMsg | TypingMsg | ChipsMsg | ActionsMsg | SystemMsg | FormMsg | OfferCardsMsg;
 
 type WsPayload = {
   messageId?: string;
@@ -428,6 +430,12 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
   );
 
   const onSend = useCallback((text: string) => sendMessage(text), [sendMessage]);
+  const applyOffer = useCallback(
+    (_entry: OfferCardEntry) => {
+      sendMessage("สมัคร");
+    },
+    [sendMessage]
+  );
 
   const onChip = useCallback(
     (chipMsgId: string, chip: ChipItem) => {
@@ -496,6 +504,8 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
           ) : (
             <IntakeForm key={message.id} onSubmit={onFormSubmit} />
           );
+        case "offerCards":
+          return <OfferCardsBlock key={message.id} cards={message.cards} onApply={applyOffer} />;
         default:
           return null;
       }
