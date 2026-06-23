@@ -37,11 +37,11 @@ export function buildChatServiceUrl(pathname: string, baseUrl = getChatServiceBa
   return url.toString();
 }
 
-export function buildChatWebSocketUrl(token = "", baseUrl = getChatServiceBaseUrl()): string {
+export function buildChatWebSocketUrl(customerId = "", baseUrl = getChatServiceBaseUrl()): string {
   const url = new URL("/ws", baseUrl);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  if (token.trim()) {
-    url.searchParams.set("token", token.trim());
+  if (customerId.trim()) {
+    url.searchParams.set("customer_id", customerId.trim());
   }
   return url.toString();
 }
@@ -91,7 +91,7 @@ async function readErrorMessage(response: Response): Promise<string> {
 }
 
 export async function fetchChatHistory(
-  token: string,
+  customerId: string,
   sessionId: string,
   limit = 100,
   signal?: AbortSignal
@@ -102,10 +102,10 @@ export async function fetchChatHistory(
   const response = await fetch(url, {
     cache: "no-store",
     signal,
-    ...(token.trim()
+    ...(customerId.trim()
       ? {
           headers: {
-            Authorization: `Bearer ${token.trim()}`,
+            "X-Customer-ID": customerId.trim(),
           },
         }
       : {}),
@@ -118,7 +118,7 @@ export async function fetchChatHistory(
   return normalizeChatHistory(await response.json());
 }
 
-export async function clearChatHistory(token: string, sessionId: string): Promise<void> {
+export async function clearChatHistory(customerId: string, sessionId: string): Promise<void> {
   const url = new URL(
     `/sessions/${encodeURIComponent(sessionId)}/messages`,
     getChatServiceBaseUrl()
@@ -128,10 +128,10 @@ export async function clearChatHistory(token: string, sessionId: string): Promis
   const response = await fetch(url, {
     method: "DELETE",
     cache: "no-store",
-    ...(token.trim()
+    ...(customerId.trim()
       ? {
           headers: {
-            Authorization: `Bearer ${token.trim()}`,
+            "X-Customer-ID": customerId.trim(),
           },
         }
       : {}),
@@ -140,4 +140,26 @@ export async function clearChatHistory(token: string, sessionId: string): Promis
   if (!response.ok) {
     throw new Error(await readErrorMessage(response));
   }
+}
+
+export async function createChatSession(customerId: string): Promise<string> {
+  const response = await fetch(buildChatServiceUrl("/sessions"), {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "X-Customer-ID": customerId.trim(),
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  const data = (await response.json()) as { sessionId?: string };
+  if (!data.sessionId) {
+    throw new Error("chat-service ไม่ได้ส่ง sessionId กลับมา");
+  }
+  return data.sessionId;
 }

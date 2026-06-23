@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { nowTime } from "@/lib/utils";
 import {
+  createChatSession,
   buildChatWebSocketUrl,
   clearChatHistory,
   fetchChatHistory,
@@ -106,6 +107,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
   const [historyLoading, setHistoryLoading] = useState(true);
   const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "open" | "closed" | "error">("idle");
   const [apiError, setApiError] = useState("");
+  const [sessionId, setSessionId] = useState("");
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollTopRef = useRef(0);
@@ -123,6 +125,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
     setHistoryLoading(true);
     setConnectionState("idle");
     setApiError("");
+    setSessionId("");
     pendingTypingIdRef.current = null;
     sendLockRef.current = false;
     optimisticUserMsgIdRef.current = null;
@@ -166,11 +169,42 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
     let alive = true;
     const abort = new AbortController();
 
+    const bootstrapSession = async () => {
+      setHistoryLoading(true);
+      setApiError("");
+      try {
+        const createdSessionId = await createChatSession(selectedUserId);
+        if (!alive) return;
+        setSessionId(createdSessionId);
+      } catch (error) {
+        if (!alive) return;
+        const message = error instanceof Error ? error.message : "สร้าง session ไม่สำเร็จ";
+        setApiError(message);
+        setHistoryLoading(false);
+      }
+    };
+
+    void bootstrapSession();
+
+    return () => {
+      alive = false;
+      abort.abort();
+    };
+  }, [selectedUserId]);
+
+  useEffect(() => {
+    if (!sessionId) {
+      return;
+    }
+
+    let alive = true;
+    const abort = new AbortController();
+
     const loadHistory = async () => {
       setHistoryLoading(true);
       setApiError("");
       try {
-        const history = await fetchChatHistory(selectedUserId, selectedUserId, 100, abort.signal);
+        const history = await fetchChatHistory(selectedUserId, sessionId, 100, abort.signal);
         if (!alive) return;
         setMessages(history.map(toTextMessage));
       } catch (error) {
@@ -188,10 +222,10 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
       alive = false;
       abort.abort();
     };
-  }, [selectedUserId]);
+  }, [selectedUserId, sessionId]);
 
   useEffect(() => {
-    if (historyLoading) return;
+    if (historyLoading || !sessionId) return;
 
     const baseUrl = getChatServiceBaseUrl();
     if (!baseUrl) {
@@ -320,7 +354,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
       socket.close();
       wsRef.current = null;
     };
-  }, [historyLoading, selectedUserId]);
+  }, [historyLoading, selectedUserId, sessionId]);
 
   const sendMessage = useCallback(
     (text: string) => {
@@ -374,7 +408,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
       try {
         socket.send(
           JSON.stringify({
-            sessionId: selectedUserId,
+            sessionId,
             content: text,
             messageType: "TEXT",
           })
@@ -392,7 +426,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
         return false;
       }
     },
-    [selectedUserId, mode]
+    [sessionId, mode]
   );
 
   const dispatch = useCallback(
@@ -451,7 +485,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
 
   const reset = useCallback(async () => {
     try {
-      await clearChatHistory(selectedUserId, selectedUserId);
+      await clearChatHistory(selectedUserId, sessionId);
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "ล้างบทสนทนาไม่สำเร็จ");
       return;
@@ -463,7 +497,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
     setConfirmAction(null);
     pendingTypingIdRef.current = null;
     sendLockRef.current = false;
-  }, [selectedUserId]);
+  }, [selectedUserId, sessionId]);
 
   const goHome = useCallback(() => {
     router.push("/");

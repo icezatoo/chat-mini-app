@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) on a mobile viewport (or DevTools device emulation at 390×844). On the home screen, pick a user and paste a chat-service token, username, or UUID before continuing.
+Open [http://localhost:3000](http://localhost:3000) on a mobile viewport (or DevTools device emulation at 390×844). On the home screen, pick a user and use that customer ID against the chat-service.
 
 ## Scripts
 
