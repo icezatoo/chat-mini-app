@@ -1,12 +1,12 @@
 # Paotang Advisor — Chat Mini App
 
-A mobile-first PWA chat interface for KTB (Krungthai Bank) debt advisory, built with Next.js 16, Tailwind CSS v4, and shadcn/ui. Frontend-only with mock state — no backend required.
+A mobile-first PWA chat interface for KTB (Krungthai Bank) debt advisory, built with Next.js 16, Tailwind CSS v4, and shadcn/ui. It connects to the live chat-service over WebSocket and history APIs.
 
 ## Features
 
-- **Chat UI** — bot (น้องฟิน) and human agent (เจ้าหน้าที่ ณัฐพล) modes with typing indicators, chip suggestions, and action shortcuts
+- **Chat UI** — bot (น้องฟิน) and human agent (เจ้าหน้าที่ ณัฐพล) modes with live chat-service messaging, typing indicators, chip suggestions, and action shortcuts
 - **Debt intake form** — 4-step guided flow (income → debts → goal → confirm) with field validation and a locked summary card
-- **Agent handoff** — animated connecting state that transitions the chat to a human advisor
+- **Agent mode** — switches the chat chrome to the human advisor identity while messages still flow through the live API
 - **PWA** — installable, standalone display, service worker caching, app icons
 - **KTB Sky Blue design system** — `#00A4E5` theme, IBM Plex Sans Thai font, iOS safe-area support
 
@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) on a mobile viewport (or DevTools device emulation at 390×844).
+Open [http://localhost:3000](http://localhost:3000) on a mobile viewport (or DevTools device emulation at 390×844). On the home screen, pick a user and use that customer ID against the chat-service.
 
 ## Scripts
 
@@ -50,7 +50,7 @@ app/
 
 components/
   chat/
-    chat-app.tsx      # Main state machine — messages, flows, mode
+    chat-app.tsx      # Main state machine — messages, live API transport, mode
     header.tsx        # Bot / agent identity bar
     input-bar.tsx     # Text input + send button
     welcome.tsx       # Topic picker shown before first message
@@ -64,7 +64,7 @@ components/
     typing-indicator.tsx
     chip-row.tsx      # Quick-reply chips
     action-row.tsx    # Banking shortcut buttons
-    connecting.tsx    # Agent connecting animation
+    connecting.tsx    # Connection state indicator
     system-divider.tsx # "Agent joined" divider
 
 lib/
@@ -82,10 +82,10 @@ public/
 | State | Trigger |
 |---|---|
 | Welcome | No messages yet — shows topic cards |
-| Active chat | Any message sent — bot responds with chips |
+| Active chat | Any message sent — backend responds over chat-service |
 | Intake form | "ปรึกษาปรับโครงสร้างหนี้" selected |
-| Locked summary | Form submitted — shows KTB ref number |
-| Agent mode | "คุยกับเจ้าหน้าที่" selected — header and replies switch to agent identity |
+| Locked summary | Form submitted — shows KTB ref number while the API reply streams back |
+| Agent mode | "คุยกับเจ้าหน้าที่" selected — header and input placeholder switch to agent identity |
 
 ## Security Headers
 
