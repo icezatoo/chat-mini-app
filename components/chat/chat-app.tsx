@@ -50,7 +50,7 @@ type WsPayload = {
   id?: string;
   sessionId?: string;
   senderRole?: string;
-  content?: string;
+  content?: unknown;
   messageType?: string;
   status?: string;
   createdAt?: string;
@@ -77,13 +77,79 @@ const formatMessageTime = (value?: string) => {
 
 const isTypingMsg = (message: Message): message is TypingMsg => message.type === "typing";
 
-const toTextMessage = (message: NormalizedChatMessage): TextMsg => ({
-  id: message.id,
-  type: message.senderRole === "bot" ? "bot" : message.senderRole === "agent" ? "agent" : "user",
-  text: message.content,
-  time: formatMessageTime(message.createdAt),
-  status: message.senderRole === "user" ? "read" : undefined,
-});
+const toRenderedMessage = (message: NormalizedChatMessage): Message => {
+  const kind = message.senderRole === "bot" ? "bot" : message.senderRole === "agent" ? "agent" : "user";
+  const isJsonMessage = String(message.messageType ?? "").trim().toUpperCase() === "JSON";
+  const cards = isJsonMessage ? parseOfferCards(message.content) : null;
+  if (cards && kind !== "user") {
+    return {
+      id: message.id,
+      type: "offerCards",
+      cards,
+    };
+  }
+
+  return {
+    id: message.id,
+    type: kind,
+    text: stringifyMessageContent(message.content),
+    time: formatMessageTime(message.createdAt),
+    status: message.senderRole === "user" ? "read" : undefined,
+  };
+};
+
+const stringifyMessageContent = (content: unknown): string => {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (content == null) {
+    return "";
+  }
+  try {
+    return JSON.stringify(content);
+  } catch {
+    return String(content);
+  }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const parseOfferCardsEntry = (value: unknown): OfferCardEntry | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const jsonType = value.jsonType;
+  const planId = value.planId;
+  const offerCard = value.offerCard;
+  if (typeof jsonType !== "string" || typeof planId !== "string" || !isRecord(offerCard)) {
+    return null;
+  }
+  return {
+    jsonType,
+    planId,
+    offerCard: offerCard as unknown as OfferCardEntry["offerCard"],
+  };
+};
+
+const parseOfferCards = (content: unknown): OfferCardEntry[] | null => {
+  if (typeof content === "string") {
+    try {
+      return parseOfferCards(JSON.parse(content));
+    } catch {
+      return null;
+    }
+  }
+
+  if (Array.isArray(content)) {
+    const entries = content.map(parseOfferCardsEntry);
+    return entries.every((entry) => entry !== null) ? (entries as OfferCardEntry[]) : null;
+  }
+
+  const entry = parseOfferCardsEntry(content);
+  return entry ? [entry] : null;
+};
 
 const buildFormPrompt = (data: FormSubmitData) => {
   const rows = buildSummaryRows(data.values)
@@ -206,7 +272,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
       try {
         const history = await fetchChatHistory(selectedUserId, sessionId, 100, abort.signal);
         if (!alive) return;
-        setMessages(history.map(toTextMessage));
+        setMessages(history.map(toRenderedMessage));
       } catch (error) {
         if (!alive) return;
         const message = error instanceof Error ? error.message : "โหลดประวัติการสนทนาไม่สำเร็จ";
@@ -314,13 +380,13 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
           const next = current.map((msg) => {
             if (optId && msg.id === optId) {
               replaced = true;
-              return toTextMessage(normalized);
+              return toRenderedMessage(normalized);
             }
             return msg;
           });
           if (!replaced) {
             const filtered = next.filter((msg) => !msg.id.startsWith("user-opt"));
-            filtered.push(toTextMessage(normalized));
+            filtered.push(toRenderedMessage(normalized));
             if (sendLockRef.current && !pendingTypingIdRef.current) {
               const typingId = makeId("typing");
               pendingTypingIdRef.current = typingId;
@@ -342,7 +408,7 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
         pendingTypingIdRef.current = null;
         sendLockRef.current = false;
         optimisticUserMsgIdRef.current = null;
-        return [...filtered, toTextMessage(normalized)];
+        return [...filtered, toRenderedMessage(normalized)];
       });
 
       if (normalized.senderRole === "bot" || normalized.senderRole === "agent") {
@@ -546,8 +612,6 @@ export default function ChatApp({ selectedUserId, selectedUserLabel }: ChatAppPr
     },
     [onAction, onChip, onFormSubmit]
   );
-
-  const canSend = connectionState === "open" && !busy;
 
   return (
     <div className="chat-screen">

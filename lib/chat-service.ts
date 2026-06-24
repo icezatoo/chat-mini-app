@@ -3,7 +3,7 @@ type ChatServiceRecord = {
   messageId?: string;
   sessionId?: string;
   senderRole?: string;
-  content?: string;
+  content?: unknown;
   messageType?: string;
   status?: string;
   createdAt?: string;
@@ -15,7 +15,7 @@ export type NormalizedChatMessage = {
   id: string;
   sessionId: string;
   senderRole: "user" | "bot" | "agent";
-  content: string;
+  content: unknown;
   messageType: string;
   status: string;
   createdAt: string;
